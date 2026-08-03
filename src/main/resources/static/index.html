@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Motor de Ejecución de Modelos WEKA</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+    <h1>Ejecutor Dinámico de Modelos de Minería de Datos</h1>
+
+    <section id="seccion-carga">
+        <h2>1. Cargar Nuevo Modelo Analítico</h2>
+        <a href="generador.html">EN CASO DE NO TENER UN MODELO, CLICK AQUÍ PARA IR AL GENERADOR DE MODELOS</a>
+        <br><br>
+        <form id="form-cargar-modelo">
+            <input type="file" id="archivo-model" accept=".model" required>
+            <button type="submit" id="btn-cargar">Cargar e Inspeccionar Modelo</button>
+        </form>
+        <p id="mensaje-estado"></p>
+    </section>
+
+    <hr>
+
+    <section id="seccion-formulario" style="display: none;">
+        <h2>2. Ingresar Datos para la Predicción</h2>
+        <form id="form-prediccion">
+            <div id="contenedor-campos"></div>
+            <br>
+            <button type="submit">Calcular Predicción Analítica</button>
+        </form>
+    </section>
+
+    <hr>
+
+    <section id="seccion-resultado" style="display: none;">
+        <h2>3. Resultado de la Predicción</h2>
+        <div>
+            <strong id="texto-resultado">Esperando ejecución...</strong>
+        </div>
+    </section>
+
+    <script src="script.js"></script>
+</body>
+</html>

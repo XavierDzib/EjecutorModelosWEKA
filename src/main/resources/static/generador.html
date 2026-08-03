@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Generador de Modelos Compatibles</title>
+</head>
+<body>
+
+    <h2>Generador de Modelos Weka</h2>
+
+    <a href="index.html">Ir al formulario de predicción</a>
+
+    <form id="formGenerador">
+        <div>
+            <label for="classifierFile">Archivo .model (clasificador):</label>
+            <input type="file" id="classifierFile" name="classifierFile" accept=".model" required>
+        </div>
+        <div>
+            <label for="structureFile">Archivo .arff (estructura):</label>
+            <input type="file" id="structureFile" name="structureFile" accept=".arff" required>
+        </div>
+        <button type="submit">Generar</button>
+    </form>
+
+    <div id="resultado"></div>
+
+<script src="scriptGenerador.js"></script>
+</body>
+</html>
