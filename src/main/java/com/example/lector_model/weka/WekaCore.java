@@ -3,6 +3,9 @@ package com.example.lector_model.weka;
 import weka.classifiers.Classifier;
 import weka.core.Instances;
 import weka.core.SerializationHelper;
+import weka.clusterers.Clusterer;
+import weka.core.DenseInstance;
+import weka.core.Instance;
 
 import org.springframework.stereotype.Component;
 
@@ -13,7 +16,7 @@ import java.util.Map;
 public class WekaCore {
 
     // Variables de estado en memoria (se sobreescriben al cargar un nuevo modelo)
-    private Classifier model;
+    private Object model; // Permite almacenar Classifier o Clusterer
     private Instances referenceStructure;
 
     /**
@@ -24,40 +27,95 @@ public class WekaCore {
         // Ejecuta la deserialización nativa de WEKA
         Object[] objects = SerializationHelper.readAll(modelStream);
         // Validación básica de estructura
-        if (objects == null || objects.length < 2) {
-            throw new IllegalArgumentException(
-            "El archivo .model no contiene la estructura requerida [Classifier, Instances]."
-            );
+        if (!(objects[0] instanceof Classifier) && !(objects[0] instanceof Clusterer)) {
+            throw new IllegalArgumentException("El archivo .model no contiene ni un Classifier ni un Clusterer válido.");
         }
-        // Validación de tipos
-        if (!(objects[0] instanceof Classifier)) {
-            throw new IllegalArgumentException(
-                "El primer objeto del .model no es un Classifier válido."
-            );
+        if (!(objects[1] instanceof Instances)) {
+            throw new IllegalArgumentException("El objeto no contiene Instances válidas.");
         }
 
-        if (!(objects[1] instanceof Instances)) {
-            throw new IllegalArgumentException(
-                "El segundo objeto del .model no contiene Instances válidas."
-            );
-        }
-        
-        // Asignamos y sobreescribimos las variables globales en memoria
-        this.model = (Classifier) objects[0];
+        this.model = objects[0];
         this.referenceStructure = (Instances) objects[1];
 
-        // Establecemos por seguridad que el último atributo es la clase predictora (si no viene predefinida)
-        if (this.referenceStructure.classIndex() == -1) {
-            this.referenceStructure.setClassIndex(this.referenceStructure.numAttributes() - 1);
+        // Configuración de clase solo si el modelo es un Classifier supervisado
+        if (this.model instanceof Classifier) {
+            if (this.referenceStructure.classIndex() == -1) {
+                this.referenceStructure.setClassIndex(this.referenceStructure.numAttributes() - 1);
+            }
+        } else {
+            // Si es un Clusterer, no existe atributo clase predictora
+            this.referenceStructure.setClassIndex(-1);
         }
     }
 
-    // Getters para que los otros módulos consulten el estado
+    /**
+     * Recibe una instancia de datos ya preparada con los valores del formulario
+     * y utiliza el clasificador en memoria para predecir el resultado.
+     */
+    public String makePrediction(Instance instance) throws Exception {
+        if (!isModelLoaded()) {
+            throw new IllegalStateException("No hay ningún modelo cargado en memoria.");
+        }
+
+        if (this.model instanceof Classifier) {
+            Classifier classifier = (Classifier) this.model;
+            double classValueIndex = classifier.classifyInstance(instance);
+
+            if (this.referenceStructure.classAttribute() != null && this.referenceStructure.classAttribute().isNominal()) {
+                return this.referenceStructure.classAttribute().value((int) classValueIndex);
+            } else {
+                return String.valueOf(classValueIndex);
+            }
+        } else if (this.model instanceof Clusterer) {
+            Clusterer clusterer = (Clusterer) this.model;
+            // Retorna el índice del cluster al que pertenece la instancia
+            int clusterIndex = clusterer.clusterInstance(instance);
+            return "Cluster asignado: " + clusterIndex;
+        }
+
+        throw new IllegalStateException("Tipo de modelo no soportado.");
+    }
     
-    public Classifier getModel() {
-        return this.model;
+    /**
+    * Recibe el mapa del controlador, construye la Instance de WEKA,
+    * delega la ejecución del método makePrediction y la devuelve.
+    */
+    public String predict(Map<String, String> dataInput) throws Exception {
+        if (!isModelLoaded()) {
+            throw new IllegalStateException("No hay un modelo cargado en memoria.");
+        }
+
+        // 1. Crear la fila virtual con el tamaño exacto de columnas que espera WEKA
+        Instance instance = new DenseInstance(this.referenceStructure.numAttributes());
+        instance.setDataset(this.referenceStructure);
+
+        // 2. Mapear los datos de texto que envió el usuario hacia el objeto de WEKA
+        for (int i = 0; i < this.referenceStructure.numAttributes(); i++) {
+            // Si es clasificación, omitimos la clase; si es clustering, leemos todos los atributos
+            if (i == this.referenceStructure.classIndex()) {
+                continue;
+            }
+
+            weka.core.Attribute attr = this.referenceStructure.attribute(i);
+            String valueStr = dataInput.get(attr.name());
+
+            if (valueStr == null || valueStr.trim().isEmpty()) {
+                instance.setMissing(attr);
+            } else {
+                if (attr.isNumeric()) {
+                    instance.setValue(attr, Double.parseDouble(valueStr));
+                } else {
+                    instance.setValue(attr, valueStr);
+                }
+            }
+        }
+
+        return makePrediction(instance);
     }
 
+    /**
+     * Devuelve la estructura de referencia de los datos que espera el modelo cargado.
+     */
     public Instances getReferenceStructure() {
         return this.referenceStructure;
     }
@@ -67,66 +125,5 @@ public class WekaCore {
      */
     public boolean isModelLoaded() {
         return this.model != null && this.referenceStructure != null;
-    }
-
-    /**
-     * Recibe una instancia de datos ya preparada con los valores del formulario
-     * y utiliza el clasificador en memoria para predecir el resultado.
-     */
-    public String makePrediction(weka.core.Instance instance) throws Exception {
-        if (!isModelLoaded()) {
-            throw new IllegalStateException("No hay ningún modelo cargado en memoria para realizar predicciones.");
-        }
-
-        // El método clasifyInstance de WEKA devuelve el índice flotante del resultado
-        double classValueIndex = this.model.classifyInstance(instance);
-
-        // Si la clase predictora es categórica/nominal, convertimos el índice al texto legible (ej: "Sí", "No")
-        if (this.referenceStructure.classAttribute().isNominal()) {
-            return this.referenceStructure.classAttribute().value((int) classValueIndex);
-        } else {
-            // Si la clase es numérica, devolvemos el número directo convertido a texto
-            return String.valueOf(classValueIndex);
-        }
-    }
-    
-    /**
-    * Recibe el mapa del controlador, construye la Instance de WEKA,
-    * delega la ejecución del método makePrediction y la devuelve.
-    */
-    public String predict(Map<String, String> dataInput) throws Exception {
-        if (this.referenceStructure == null || this.model == null) {
-            throw new IllegalStateException("No hay un modelo cargado en memoria para realizar predicciones.");
-        }
-
-        // 1. Crear la fila virtual con el tamaño exacto de columnas que espera WEKA
-        weka.core.Instance instance = new weka.core.DenseInstance(this.referenceStructure.numAttributes());
-        instance.setDataset(this.referenceStructure);
-
-        // 2. Mapear los datos de texto que envió el usuario hacia el objeto de WEKA
-        for (int i = 0; i < this.referenceStructure.numAttributes(); i++) {
-            weka.core.Attribute attr = this.referenceStructure.attribute(i);
-
-            // Saltamos el atributo clase, que es el que vamos a predecir
-            if (i == this.referenceStructure.classIndex()) {
-                continue;
-            }
-
-            String valueStr = dataInput.get(attr.name());
-
-            if (valueStr == null || valueStr.trim().isEmpty()) {
-                instance.setMissing(attr);
-            } else {
-                if (attr.isNumeric()) {
-                    instance.setValue(attr, Double.parseDouble(valueStr));
-                } else if (attr.isNominal()) {
-                    instance.setValue(attr, valueStr);
-                } else {
-                    instance.setValue(attr, valueStr);
-                }
-            }
-        }
-        // 3. Utilizar el método pasándole la instancia ya estructurada
-        return makePrediction(instance);
     }
 }

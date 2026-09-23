@@ -18,16 +18,22 @@ public class MetadataTransformer {
         int classIndex = structure.classIndex();
         int numAttributes = structure.numAttributes();
 
-        // Recorremos todos los atributos que espera el modelo
+         // Recorremos todos los atributos que espera el modelo
         for (int i = 0; i < numAttributes; i++) {
-            // Omite la clase predictora del formulario (el resultado de la predicción).
-            // El usuario no se escribirá el resultado.
-            if (i == classIndex) {
+            // 1. Regla para modelos supervisados (árboles): Omitir el índice de la clase objetivo
+            if (classIndex != -1 && i == classIndex) {
                 continue; 
             }
 
             Attribute attr = structure.attribute(i);
             String name = attr.name();
+
+            // 2. Regla para modelos no supervisados (clustering, classIndex == -1):
+            // Ignorar la columna si contiene el nombre de la etiqueta/especie
+            if (classIndex == -1 && (name.equalsIgnoreCase("class") || name.equalsIgnoreCase("especie") || name.equalsIgnoreCase("target") || name.equalsIgnoreCase("species"))) {
+                continue;
+            }
+
             String type;
 
             // Identificar el tipo de dato adaptándolo a estándares web
@@ -46,7 +52,7 @@ public class MetadataTransformer {
                 dtoList.add(new AttributeDTO(name, type, options));
                 
             } else {
-                // Manejo por si el modelo incluye fechas, texto plano, etc.
+                // Manejo opcional por si el modelo incluye fechas, texto plano, etc.
                 type = "text";
                 dtoList.add(new AttributeDTO(name, type));
             }

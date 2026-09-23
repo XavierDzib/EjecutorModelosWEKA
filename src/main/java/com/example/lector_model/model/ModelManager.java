@@ -39,6 +39,7 @@ public class ModelManager {
 
     /**
      * Permite consultar la estructura del modelo que se encuentra activo en memoria.
+     * Útil si el frontend se recarga y necesita volver a pintar el formulario.
      */
     public List<AttributeDTO> getCurrentModelMetadata() {
         Instances estructura = wekaCore.getReferenceStructure();

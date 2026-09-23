@@ -2,15 +2,12 @@ package com.example.lector_model.api;
 
 import com.example.lector_model.model.ModelManager;
 import com.example.lector_model.transformer.AttributeDTO;
-import com.example.lector_model.weka.GeneradorModelo;
 import com.example.lector_model.weka.WekaCore;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.http.MediaType;
-import org.springframework.http.HttpHeaders;
 
 import java.util.List;
 import java.util.Map;
@@ -22,13 +19,11 @@ public class ApiController {
 
     private final ModelManager modelManager;
     private final WekaCore wekaCore;
-    private GeneradorModelo generadorModelo;
 
     // Inyección de los componentes requeridos
-    public ApiController(ModelManager modelManager, WekaCore wekaCore, GeneradorModelo generadorModelo) {
+    public ApiController(ModelManager modelManager, WekaCore wekaCore) {
         this.modelManager = modelManager;
         this.wekaCore = wekaCore;
-        this.generadorModelo = generadorModelo;
     }
 
     /**
@@ -71,34 +66,6 @@ public class ApiController {
             e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Error al calcular la predicción: " + e.getMessage());
-        }
-    }
-
-    /**
-     * Endpoint para generar un modelo correcto.
-     * Recibe dos archivos: uno con el clasificador y otro con la estructura.
-     * Procesa ambos archivos y devuelve un nuevo archivo .model correcto listo para descargar.
-     */
-    @PostMapping("/generar")
-    public ResponseEntity<byte[]> generarModelo(
-            @RequestParam("classifierFile") MultipartFile classifierFile,
-            @RequestParam("structureFile") MultipartFile structureFile) {
-        try {
-            // Procesar en memoria usando streams
-            byte[] modeloCompleto = generadorModelo.generarModeloCompleto(
-                classifierFile.getInputStream(), 
-                structureFile.getInputStream()
-            );
-
-            // Construir respuesta de descarga (attachment) con el tipo application/octet-stream
-            return ResponseEntity.ok()
-                    .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"modelo_completo.model\"")
-                    .body(modeloCompleto);
-
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.internalServerError().build();
         }
     }
 }
